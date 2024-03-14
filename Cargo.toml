@@ -1,0 +1,15 @@
+[package]
+name = "audion"
+version = "0.1.0"
+edition = "2021"
+authors = ["Fabian Affolter <fabian.affolter@audius.de>"]
+description = "Ping the host continuously and write results to a file"
+license = "MIT"
+homepage = "https://github.com/audiusGmbH/audion"
+repository = "https://github.com/audiusGmbH/audion"
+
+[dependencies]
+chrono = "0.4.19"
+surge-ping = "0.1.1"
+tokio = { version = "1", features = ["full"] }
+seahorse = "2.2.0"
