@@ -22,7 +22,7 @@ Usage:
 Flags:
 	-t, --target <string> : Target host to ping
 	-o, --output <string> : Output file to write results
-	-ms, --timeout <int>  : Timeout in milliseconds
+	-to, --timeout <int>  : Timeout in milliseconds
 	-i, --interval <int>  : Interval between pings in seconds
 	-h, --help            : Show help
 
