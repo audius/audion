@@ -1,7 +1,9 @@
 # audion
 
-Ping the host continuously and write results to a file. The tool
+Ping a host continuously and write results to a file. The tool
 send ICMP echo requests to check if the target is "on".
+
+`sudo` is required to execute the tool.
 
 ## Installation
 
