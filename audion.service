@@ -1,0 +1,11 @@
+[Unit]
+Description=audion
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/audion -t 8.8.8.8 -o 8.8.8.8-output.txt
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
