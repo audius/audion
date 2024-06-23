@@ -5,8 +5,8 @@ edition = "2021"
 authors = ["Fabian Affolter <fabian.affolter@audius.de>"]
 description = "Ping the host continuously and write results to a file"
 license = "MIT"
-homepage = "https://github.com/audiusGmbH/audion"
-repository = "https://github.com/audiusGmbH/audion"
+homepage = "https://github.com/audius/audion"
+repository = "https://github.com/audius/audion"
 
 [dependencies]
 chrono = "0.4.19"
