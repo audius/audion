@@ -6,7 +6,7 @@ use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr};
 use chrono::{Local};
 use std::time::Duration;
-use surge_ping::{Pinger, SurgeError};
+use surge_ping::{Client, Config, SurgeError, PingIdentifier, PingSequence};
 use tokio::time::timeout;
 use seahorse::{App, Context, Flag, FlagType};
 
@@ -54,29 +54,27 @@ async fn ping_host(target_host: &str, output_file: &str, timeout_ms: u64, interv
         }
     };
 
-    let mut pinger = Pinger::new(ip_addr)?;
-    pinger.timeout(Duration::from_millis(timeout_ms));
+    let config = Config::default();
+    let client = Client::new(&config).map_err(CustomError::IoError)?;
+    let mut pinger = client.pinger(ip_addr, PingIdentifier(0)).await;
 
     loop {
-        let result = match timeout(Duration::from_millis(timeout_ms), pinger.ping(4)).await {
-            Ok(result) => match result {
-                Ok(_) => {
-                    format!("Host {} is reachable", target_host)
-                }
-                Err(_) => {
-                    format!("Host {} is unreachable", target_host)
-                }
-            },
+        let result = match timeout(Duration::from_millis(timeout_ms), pinger.ping(PingSequence(0), &[0])).await {
+            Ok(Ok((_packet, _duration))) => {
+                format!("Host {} is reachable", target_host)
+            }
+            Ok(Err(_)) => {
+                format!("Host {} is unreachable", target_host)
+            }
             Err(_) => {
                 return Err(CustomError::TimeoutError);
             }
         };
 
         let timestamp = Local::now().format("[%Y-%m-%d %H:%M:%S]").to_string();
-        let content = format!("{} {}\n", timestamp, result);
+        let content = format!("{} {}", timestamp, result);
         append_to_file(output_file, &content)?;
 
-        // Wait for the specified interval before next iteration
         tokio::time::sleep(Duration::from_secs(interval_secs)).await;
     }
 }
