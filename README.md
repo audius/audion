@@ -1,7 +1,7 @@
 # audion
 
 Ping a host continuously and write results to a file. The tool
-send ICMP echo requests to check if the target is "on".
+send ICMP Type 8 (echo) requests to check if the target is "on".
 
 `sudo` is required to execute the tool.
 
@@ -18,6 +18,8 @@ $ nix-env -iA nixos.audion
 ```
 
 ## Usage
+
+The tool requires elevated permissions. Thus, run it with `sudo` or `doas`.
 
 ```bash
 $ sudo audion -h
@@ -42,6 +44,26 @@ Flags:
 
 Version:
 	0.1.0
+```
+
+## Development
+
+Run tests:
+
+```bash
+$ nix-shell --run "cargo test"
+``` 
+
+Build everything:
+
+```bash
+$ nix-shell --run "cargo clean && cargo build"
+```
+
+Run the app:
+
+```bash
+$ nix-shell --run "cargo run -- --host 127.0.0.1 --port 8080 --wt-port 4433"
 ```
 
 ## License
