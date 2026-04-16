@@ -43,7 +43,7 @@ impl fmt::Display for CustomError {
 
 impl Error for CustomError {}
 
-async fn ping_host(target_host: &str, output_file: &str, timeout_ms: u64, interval_secs: u64) -> Result<(), CustomError> {
+async fn ping_host(target_host: &str, output_file: &str, timeout_ms: u64, interval_secs: u64, verbose: bool) -> Result<(), CustomError> {
     let ip_addr = match target_host.parse::<Ipv4Addr>() {
         Ok(ip) => IpAddr::V4(ip),
         Err(_) => {
@@ -74,6 +74,9 @@ async fn ping_host(target_host: &str, output_file: &str, timeout_ms: u64, interv
         let timestamp = Local::now().format("[%Y-%m-%d %H:%M:%S]").to_string();
         let content = format!("{} {}", timestamp, result);
         append_to_file(output_file, &content)?;
+        if verbose {
+            println!("{}", content);
+        }
 
         tokio::time::sleep(Duration::from_secs(interval_secs)).await;
     }
@@ -101,7 +104,8 @@ fn main() {
         .flag(Flag::new("target", FlagType::String).description("Target host to ping").alias("t"))
         .flag(Flag::new("output", FlagType::String).description("Output file to write results").alias("o"))
         .flag(Flag::new("timeout", FlagType::Int).description("Timeout in milliseconds").alias("to"))
-        .flag(Flag::new("interval", FlagType::Int).description("Interval between pings in seconds").alias("i"));
+        .flag(Flag::new("interval", FlagType::Int).description("Interval between pings in seconds").alias("i"))
+        .flag(Flag::new("verbose", FlagType::Bool).description("Print output to stdout").alias("v"));
 
     app.run(args);
 }
@@ -111,9 +115,10 @@ fn action(context: &Context) {
     let output_file = context.string_flag("output").unwrap_or("output.txt".to_string());
     let timeout_ms = context.int_flag("timeout").unwrap_or(1000) as u64;
     let interval_secs = context.int_flag("interval").unwrap_or(60) as u64;
+    let verbose = context.bool_flag("verbose");
 
     tokio::runtime::Runtime::new().unwrap().block_on(async {
-        if let Err(err) = ping_host(&target, &output_file, timeout_ms, interval_secs).await {
+        if let Err(err) = ping_host(&target, &output_file, timeout_ms, interval_secs, verbose).await {
             eprintln!("Error: {}", err);
             std::process::exit(1);
         }
