@@ -121,6 +121,16 @@ fn action(context: &Context) {
     let timeout_ms = context.int_flag("timeout").unwrap_or(DEFAULT_TIMEOUT_MS) as u64;
     let interval_secs = context.int_flag("interval").unwrap_or(DEFAULT_INTERVAL_SECS) as u64;
     let verbose = context.bool_flag("verbose");
+    let settings_line = format!(
+        "Settings: Target: {}, Output: {}, Timeout (ms): {}, Interval (s): {}",
+        target, output_file, timeout_ms, interval_secs
+    );
+
+    println!("{}", settings_line);
+    if let Err(err) = append_to_file(&output_file, &settings_line) {
+        eprintln!("Error: {}", err);
+        std::process::exit(1);
+    }
 
     tokio::runtime::Runtime::new().unwrap().block_on(async {
         if let Err(err) = ping_host(&target, &output_file, timeout_ms, interval_secs, verbose).await {
