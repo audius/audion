@@ -15,39 +15,43 @@ const DEFAULT_OUTPUT_FILE: &str = "output.txt";
 const DEFAULT_TIMEOUT_MS: isize = 1000;
 const DEFAULT_INTERVAL_SECS: isize = 60;
 
+/// Custom error type to encapsulate different kinds of errors that can occur in the application
 #[derive(Debug)]
 enum CustomError {
     HostResolutionFailure,
     SurgeError(SurgeError),
     IoError(std::io::Error),
-    TimeoutError,
 }
 
+/// Implement conversion from SurgeError to CustomError to allow easy error handling when performing ping operations
 impl From<SurgeError> for CustomError {
     fn from(error: SurgeError) -> Self {
         CustomError::SurgeError(error)
     }
 }
 
+/// Implement conversion from std::io::Error to CustomError to allow easy error handling when performing file operations
 impl From<std::io::Error> for CustomError {
     fn from(error: std::io::Error) -> Self {
         CustomError::IoError(error)
     }
 }
 
+/// Custom error type that encapsulates different kinds of errors that can occur in the application
 impl fmt::Display for CustomError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CustomError::HostResolutionFailure => write!(f, "Host resolution failure"),
             CustomError::SurgeError(e) => write!(f, "Surge error: {:?}", e),
             CustomError::IoError(e) => write!(f, "I/O error: {}", e),
-            CustomError::TimeoutError => write!(f, "Timeout error"),
         }
     }
 }
 
+/// Implement the standard Error trait for CustomError to allow it to be used as an error type in Rust
 impl Error for CustomError {}
 
+/// Asynchronous function to ping a host and log the results to a file
 async fn ping_host(target_host: &str, output_file: &str, timeout_ms: u64, interval_secs: u64, verbose: bool) -> Result<(), CustomError> {
     let ip_addr = match target_host.parse::<Ipv4Addr>() {
         Ok(ip) => IpAddr::V4(ip),
@@ -62,17 +66,34 @@ async fn ping_host(target_host: &str, output_file: &str, timeout_ms: u64, interv
     let config = Config::default();
     let client = Client::new(&config).map_err(CustomError::IoError)?;
     let mut pinger = client.pinger(ip_addr, PingIdentifier(0)).await;
+    let mut seq_num: u16 = 0;
 
     loop {
-        let result = match timeout(Duration::from_millis(timeout_ms), pinger.ping(PingSequence(0), &[0])).await {
-            Ok(Ok((_packet, _duration))) => {
-                format!("Host {} is reachable", target_host)
+        let result = match timeout(Duration::from_millis(timeout_ms), pinger.ping(PingSequence(seq_num), &[0])).await {
+            Ok(Ok((packet, duration))) => {
+                let rtt_ms = duration.as_secs_f64() * 1000.0;
+                match packet {
+                    surge_ping::IcmpPacket::V4(icmpv4) => {
+                        let packet_size = icmpv4.get_size();
+                        let ttl = icmpv4.get_ttl().unwrap_or(0);
+                        format!(
+                            "Host {} is reachable ({} bytes from {}: icmp_seq={} ttl={} time={:.3} ms)",
+                            target_host, packet_size, target_host, seq_num, ttl, rtt_ms
+                        )
+                    }
+                    surge_ping::IcmpPacket::V6(_) => {
+                        format!(
+                            "Host {} is reachable (from {}: icmp_seq={} time={:.3} ms)",
+                            target_host, target_host, seq_num, rtt_ms
+                        )
+                    }
+                }
             }
             Ok(Err(_)) => {
-                format!("Host {} is unreachable", target_host)
+                format!("Host {} is unreachable (icmp_seq={} Destination Host Unreachable)", target_host, seq_num)
             }
             Err(_) => {
-                return Err(CustomError::TimeoutError);
+                format!("Host {} is unreachable (icmp_seq={} timeout)", target_host, seq_num)
             }
         };
 
@@ -83,10 +104,12 @@ async fn ping_host(target_host: &str, output_file: &str, timeout_ms: u64, interv
             println!("{}", content);
         }
 
+        seq_num = seq_num.wrapping_add(1);
         tokio::time::sleep(Duration::from_secs(interval_secs)).await;
     }
 }
 
+/// Helper function to append content to a file, creating the file if it doesn't exist
 fn append_to_file(file_path: &str, content: &str) -> Result<(), CustomError> {
     if !fs::metadata(file_path).is_ok() {
         let _ = OpenOptions::new().create(true).write(true).open(file_path)?;
@@ -97,6 +120,7 @@ fn append_to_file(file_path: &str, content: &str) -> Result<(), CustomError> {
     Ok(())
 }
 
+/// Main function that sets up the command-line interface and runs the application
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -115,6 +139,7 @@ fn main() {
     app.run(args);
 }
 
+/// Main action function that executes the pinging logic based on the provided context and flags
 fn action(context: &Context) {
     let target = context.string_flag("target").unwrap_or(DEFAULT_TARGET.to_string());
     let output_file = context.string_flag("output").unwrap_or(DEFAULT_OUTPUT_FILE.to_string());
