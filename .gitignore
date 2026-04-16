@@ -15,3 +15,6 @@ target/
 
 # Ignore text files
 *.txt
+
+# vscode
+*.code-workspace
