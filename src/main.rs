@@ -20,7 +20,6 @@ enum CustomError {
     HostResolutionFailure,
     SurgeError(SurgeError),
     IoError(std::io::Error),
-    TimeoutError,
 }
 
 impl From<SurgeError> for CustomError {
@@ -41,7 +40,6 @@ impl fmt::Display for CustomError {
             CustomError::HostResolutionFailure => write!(f, "Host resolution failure"),
             CustomError::SurgeError(e) => write!(f, "Surge error: {:?}", e),
             CustomError::IoError(e) => write!(f, "I/O error: {}", e),
-            CustomError::TimeoutError => write!(f, "Timeout error"),
         }
     }
 }
@@ -62,17 +60,34 @@ async fn ping_host(target_host: &str, output_file: &str, timeout_ms: u64, interv
     let config = Config::default();
     let client = Client::new(&config).map_err(CustomError::IoError)?;
     let mut pinger = client.pinger(ip_addr, PingIdentifier(0)).await;
+    let mut seq_num: u16 = 0;
 
     loop {
-        let result = match timeout(Duration::from_millis(timeout_ms), pinger.ping(PingSequence(0), &[0])).await {
-            Ok(Ok((_packet, _duration))) => {
-                format!("Host {} is reachable", target_host)
+        let result = match timeout(Duration::from_millis(timeout_ms), pinger.ping(PingSequence(seq_num), &[0])).await {
+            Ok(Ok((packet, duration))) => {
+                let rtt_ms = duration.as_secs_f64() * 1000.0;
+                match packet {
+                    surge_ping::IcmpPacket::V4(icmpv4) => {
+                        let packet_size = icmpv4.get_size();
+                        let ttl = icmpv4.get_ttl().unwrap_or(0);
+                        format!(
+                            "Host {} is reachable ({} bytes from {}: icmp_seq={} ttl={} time={:.3} ms)",
+                            target_host, packet_size, target_host, seq_num, ttl, rtt_ms
+                        )
+                    }
+                    surge_ping::IcmpPacket::V6(_) => {
+                        format!(
+                            "Host {} is reachable (from {}: icmp_seq={} time={:.3} ms)",
+                            target_host, target_host, seq_num, rtt_ms
+                        )
+                    }
+                }
             }
             Ok(Err(_)) => {
-                format!("Host {} is unreachable", target_host)
+                format!("Host {} is unreachable (icmp_seq={} Destination Host Unreachable)", target_host, seq_num)
             }
             Err(_) => {
-                return Err(CustomError::TimeoutError);
+                format!("Host {} is unreachable (icmp_seq={} timeout)", target_host, seq_num)
             }
         };
 
@@ -83,6 +98,7 @@ async fn ping_host(target_host: &str, output_file: &str, timeout_ms: u64, interv
             println!("{}", content);
         }
 
+        seq_num = seq_num.wrapping_add(1);
         tokio::time::sleep(Duration::from_secs(interval_secs)).await;
     }
 }
