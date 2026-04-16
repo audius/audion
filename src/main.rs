@@ -10,6 +10,11 @@ use surge_ping::{Client, Config, SurgeError, PingIdentifier, PingSequence};
 use tokio::time::timeout;
 use seahorse::{App, Context, Flag, FlagType};
 
+const DEFAULT_TARGET: &str = "127.0.0.1";
+const DEFAULT_OUTPUT_FILE: &str = "output.txt";
+const DEFAULT_TIMEOUT_MS: isize = 1000;
+const DEFAULT_INTERVAL_SECS: isize = 60;
+
 #[derive(Debug)]
 enum CustomError {
     HostResolutionFailure,
@@ -101,20 +106,20 @@ fn main() {
         .usage("audion [args]")
         .version(env!("CARGO_PKG_VERSION"))
         .action(action)
-        .flag(Flag::new("target", FlagType::String).description("Target host to ping").alias("t"))
-        .flag(Flag::new("output", FlagType::String).description("Output file to write results").alias("o"))
-        .flag(Flag::new("timeout", FlagType::Int).description("Timeout in milliseconds").alias("to"))
-        .flag(Flag::new("interval", FlagType::Int).description("Interval between pings in seconds").alias("i"))
+        .flag(Flag::new("target", FlagType::String).description("Target host to ping (default: 127.0.0.1)").alias("t"))
+        .flag(Flag::new("output", FlagType::String).description("Output file to write results (default: output.txt)").alias("o"))
+        .flag(Flag::new("timeout", FlagType::Int).description("Timeout in milliseconds (default: 1000)").alias("to"))
+        .flag(Flag::new("interval", FlagType::Int).description("Interval between pings in seconds (default: 60)").alias("i"))
         .flag(Flag::new("verbose", FlagType::Bool).description("Print output to stdout").alias("v"));
 
     app.run(args);
 }
 
 fn action(context: &Context) {
-    let target = context.string_flag("target").unwrap_or("127.0.0.1".to_string());
-    let output_file = context.string_flag("output").unwrap_or("output.txt".to_string());
-    let timeout_ms = context.int_flag("timeout").unwrap_or(1000) as u64;
-    let interval_secs = context.int_flag("interval").unwrap_or(60) as u64;
+    let target = context.string_flag("target").unwrap_or(DEFAULT_TARGET.to_string());
+    let output_file = context.string_flag("output").unwrap_or(DEFAULT_OUTPUT_FILE.to_string());
+    let timeout_ms = context.int_flag("timeout").unwrap_or(DEFAULT_TIMEOUT_MS) as u64;
+    let interval_secs = context.int_flag("interval").unwrap_or(DEFAULT_INTERVAL_SECS) as u64;
     let verbose = context.bool_flag("verbose");
 
     tokio::runtime::Runtime::new().unwrap().block_on(async {
