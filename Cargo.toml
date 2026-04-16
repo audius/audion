@@ -1,6 +1,6 @@
 [package]
 name = "audion"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 authors = ["Fabian Affolter <fabian.affolter@audius.de>"]
 description = "Send ICMP type 8 requests to a host continuously and write results to a file"
